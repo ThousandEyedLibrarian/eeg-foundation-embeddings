@@ -11,6 +11,9 @@ build/
 .venv*/
 venv*/
 
+# uv cache (lockfile is committed intentionally)
+.uv/
+
 # IDE
 .idea/
 .vscode/

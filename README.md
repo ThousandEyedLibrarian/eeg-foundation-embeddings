@@ -1,4 +1,4 @@
-# EEG Foundation Model Docker Images
+# eeg-foundation-embeddings
 
 Reusable Docker images for extracting embeddings from raw EDF files using EEG foundation models.
 
@@ -74,9 +74,12 @@ See `labram/config.yaml` and `reve/config.yaml` for defaults.
 ## Development
 
 ```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Run tests (no GPU needed)
-pip install pytest mne numpy zarr numcodecs
-python -m pytest tests/
+uv sync --extra dev
+uv run pytest tests/
 ```
 
 ## Requirements

@@ -26,10 +26,30 @@ Docker images for extracting embeddings from raw EDF files using EEG foundation 
 - LaBraM supports both braindecode wrapper and original repo backend (config flag)
 - REVE requires HF_TOKEN at runtime for gated model access
 
+## Dependencies
+
+Uses `uv` for all package management. Dependencies declared in `pyproject.toml` with optional extras:
+
+- `dev` - pytest (for running tests locally)
+- `labram` - braindecode, timm (LaBraM-specific, used in Docker)
+- `reve` - transformers, safetensors, huggingface_hub (REVE-specific, used in Docker)
+
+PyTorch is excluded from `pyproject.toml` because labram and reve need different CUDA-specific builds. It is installed separately in each Dockerfile.
+
+```bash
+# Local dev (no torch needed for tests)
+uv sync --extra dev
+uv run pytest tests/
+
+# Add a new package
+uv add <package-name>
+```
+
 ## Running Tests
 
 ```bash
-python -m pytest tests/
+uv sync --extra dev
+uv run pytest tests/
 ```
 
 ## Building Docker Images
