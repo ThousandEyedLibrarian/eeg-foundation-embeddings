@@ -12,7 +12,7 @@ import torch
 from shared.channel_maps import get_labram_matched_channels
 from shared.config import FullConfig
 from shared.edf_loader import load_edf
-from shared.preprocessing import PreprocessingConfig, preprocess
+from shared.preprocessing import preprocess
 from shared.zarr_writer import write_embeddings
 
 logger = logging.getLogger(__name__)
@@ -73,6 +73,9 @@ def load_model_original(
     from labram_original.modeling_finetune import labram_base_patch200_200
 
     model = labram_base_patch200_200(num_classes=2, use_mean_pooling=True)
+    # weights_only=False needed here - the original checkpoint stores
+    # non-tensor state. Only safe with trusted checkpoints (Docker image
+    # bundles the official one).
     ckpt = torch.load(checkpoint, map_location="cpu", weights_only=False)
     model.load_state_dict(ckpt["model"], strict=False)
     model = model.to(device)
@@ -178,20 +181,18 @@ def process_edf(
         Path to the created .zarr store, or None on failure.
     """
     try:
-        # Load EDF
         data, ch_names, edf_metadata = load_edf(
             edf_path,
             target_sr=config.preprocessing.target_sr,
         )
 
-        # Match channels to LaBraM vocabulary
         matched_names, input_chans = get_labram_matched_channels(ch_names)
         if not matched_names:
             logger.warning("No LaBraM-compatible channels in %s, skipping", edf_path.name)
             return None
 
-        # Select only matched channels from data
-        ch_indices = [ch_names.index(name) for name in matched_names]
+        ch_name_to_idx = {name: i for i, name in enumerate(ch_names)}
+        ch_indices = [ch_name_to_idx[name] for name in matched_names]
         data = data[ch_indices]
 
         logger.info(
@@ -199,12 +200,10 @@ def process_edf(
             len(matched_names), len(ch_names), edf_path.name,
         )
 
-        # Preprocess
         windows, padding_mask, preproc_metadata = preprocess(
             data, config.preprocessing.target_sr, config.preprocessing,
         )
 
-        # Load model if not provided
         if model is None:
             if config.model.backend == "original":
                 model = load_model_original(
@@ -217,7 +216,6 @@ def process_edf(
                     config.model.device,
                 )
 
-        # Extract embeddings
         if config.model.backend == "original":
             embeddings = extract_embeddings_original(
                 model, windows, input_chans,
@@ -229,7 +227,6 @@ def process_edf(
                 config.model.batch_size, config.model.device,
             )
 
-        # Build combined metadata
         metadata = {
             "model_name": "labram",
             "model_backend": config.model.backend,
@@ -239,7 +236,6 @@ def process_edf(
             "preprocessing": preproc_metadata,
         }
 
-        # Write Zarr
         output_name = edf_path.stem
         output_path = output_dir / f"{output_name}.zarr"
 

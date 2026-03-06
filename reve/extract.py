@@ -137,7 +137,6 @@ def process_edf(
         Path to the created .zarr store, or None on failure.
     """
     try:
-        # Load EDF
         data, ch_names, edf_metadata = load_edf(
             edf_path,
             target_sr=config.preprocessing.target_sr,
@@ -148,12 +147,10 @@ def process_edf(
             edf_path.name, len(ch_names), edf_metadata["original_duration_sec"],
         )
 
-        # Preprocess
         windows, padding_mask, preproc_metadata = preprocess(
             data, config.preprocessing.target_sr, config.preprocessing,
         )
 
-        # Load model if not provided
         if model is None or pos_bank is None:
             model, pos_bank = load_model(
                 size=config.model.size,
@@ -161,16 +158,13 @@ def process_edf(
                 device=config.model.device,
             )
 
-        # Determine embedding dim
         emb_dim = REVE_EMBEDDING_DIMS.get(config.model.size, 512)
 
-        # Extract embeddings
         embeddings = extract_embeddings(
             model, pos_bank, windows, ch_names,
             config.model.batch_size, config.model.device,
         )
 
-        # Build combined metadata
         metadata = {
             "model_name": "reve",
             "model_size": config.model.size,
@@ -180,7 +174,6 @@ def process_edf(
             "preprocessing": preproc_metadata,
         }
 
-        # Write Zarr
         output_name = edf_path.stem
         output_path = output_dir / f"{output_name}.zarr"
 

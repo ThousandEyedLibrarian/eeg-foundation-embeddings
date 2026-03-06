@@ -1,34 +1,53 @@
 #!/bin/bash
 set -euo pipefail
 
-# LaBraM EEG Embedding Extraction
-#
-# Usage:
-#   docker run --gpus all -v /data:/data labram-embeddings /data/input /data/output
-#   docker run --gpus all -v /data:/data labram-embeddings /data/input/file.edf /data/output
-#   docker run --gpus all -v /data:/data labram-embeddings --config /data/config.yaml /data/input /data/output
-#
-# Options:
-#   --backend braindecode|original   (default: braindecode)
-#   --batch-size N                   (default: 4)
-#   --window-size SEC                (default: 10)
-#   --skip-start SEC                 (default: 0)
-#   --max-duration SEC               (default: 0, meaning use all)
-#   --notch-freq HZ                  (default: 50)
-#   --bandpass-low HZ                (default: 0.1)
-#   --bandpass-high HZ               (default: 75)
-#   --config PATH                    (YAML config file)
-#   --verbose                        (print progress)
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [OPTIONS] INPUT_PATH OUTPUT_PATH
+
+Extract LaBraM embeddings from EDF files into Zarr stores.
+
+INPUT_PATH   Single .edf file or directory of .edf files
+OUTPUT_PATH  Directory for .zarr output
+
+Options:
+  --help                           Show this help
+  --dry-run                        List files that would be processed, then exit
+  --backend braindecode|original   Model backend (default: braindecode)
+  --batch-size N                   Inference batch size (default: 4)
+  --window-size SEC                EEG window length (default: 10)
+  --skip-start SEC                 Skip N seconds from start (default: 0)
+  --max-duration SEC               Max seconds to use, 0=all (default: 0)
+  --notch-freq HZ                  Notch filter frequency (default: 50)
+  --bandpass-low HZ                Bandpass low cutoff (default: 0.1)
+  --bandpass-high HZ               Bandpass high cutoff (default: 75)
+  --config PATH                    YAML config file
+  --verbose                        Debug logging
+
+Examples:
+  $0 /data/input/recording.edf /data/output
+  $0 --backend original --batch-size 8 /data/input /data/output
+  $0 --config /data/config.yaml /data/input /data/output
+EOF
+}
 
 CONFIG_FILE=""
 CLI_OVERRIDES=""
 VERBOSE=""
+DRY_RUN=false
 INPUT_PATH=""
 OUTPUT_PATH=""
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
         --config)
             CONFIG_FILE="$2"
             shift 2
@@ -71,6 +90,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -*)
             echo "Unknown option: $1" >&2
+            echo "Try '$0 --help' for usage." >&2
             exit 1
             ;;
         *)
@@ -87,16 +107,32 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate required arguments
 if [[ -z "$INPUT_PATH" || -z "$OUTPUT_PATH" ]]; then
-    echo "Usage: $0 [OPTIONS] INPUT_PATH OUTPUT_PATH" >&2
-    echo "" >&2
-    echo "INPUT_PATH can be a single .edf file or a directory containing .edf files." >&2
-    echo "OUTPUT_PATH is the directory where .zarr files will be written." >&2
+    usage
     exit 1
 fi
 
-# Build Python command
+# Dry run: list EDF files and exit
+if [[ "$DRY_RUN" == true ]]; then
+    echo "Dry run - files that would be processed:"
+    if [[ -f "$INPUT_PATH" ]]; then
+        echo "  $INPUT_PATH"
+    elif [[ -d "$INPUT_PATH" ]]; then
+        count=0
+        while IFS= read -r -d '' f; do
+            echo "  $f"
+            count=$((count + 1))
+        done < <(find "$INPUT_PATH" -name '*.edf' -print0 | sort -z)
+        echo "Total: $count file(s)"
+    else
+        echo "Input path does not exist: $INPUT_PATH" >&2
+        exit 1
+    fi
+    echo "Output directory: $OUTPUT_PATH"
+    [[ -n "$CONFIG_FILE" ]] && echo "Config: $CONFIG_FILE"
+    exit 0
+fi
+
 PYTHON_ARGS=""
 
 if [[ -n "$CONFIG_FILE" ]]; then

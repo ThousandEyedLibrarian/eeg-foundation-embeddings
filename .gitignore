@@ -43,3 +43,7 @@ Thumbs.db
 
 # Test output
 tests/output/
+docs/
+
+# Claude
+CLAUDE.md

@@ -244,23 +244,14 @@ def preprocess(
             - padding_mask: (n_windows,) bool
             - metadata: Dict with preprocessing details
     """
-    # 1. Bandpass + notch filtering
     filtered = apply_filters(data, sr, config)
-
-    # 2. Time window extraction (skip start, max duration, min check)
     trimmed, time_info = extract_time_window(filtered, sr, config)
-
-    # 3. Normalisation (per-channel, across recording)
     normalised = _apply_normalisation(trimmed, config)
-
-    # 4. Clipping
     clipped = _apply_clipping(normalised, config.clip_std)
 
-    # 5. Scale factor (e.g., /100 for LaBraM)
     if config.scale_factor != 1.0:
         clipped = clipped * config.scale_factor
 
-    # 6. Windowing
     windows, padding_mask, timestamps = create_windows(clipped, sr, config)
 
     metadata = {

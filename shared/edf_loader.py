@@ -49,7 +49,6 @@ def load_edf(
 
     raw = _read_edf_with_fallback(path)
 
-    # Get original metadata before any modifications
     original_sr = raw.info["sfreq"]
     original_duration = raw.times[-1] if len(raw.times) > 0 else 0.0
 
@@ -63,7 +62,7 @@ def load_edf(
             f"Available channels: {all_ch_names}"
         )
 
-    # Build a mapping from normalised name back to original name for picking
+    # Map normalised names back to original names (MNE needs the originals)
     normalised_set = set(normalised_names)
     norm_to_orig = {}
     for orig_name in all_ch_names:
@@ -71,7 +70,6 @@ def load_edf(
         if norm in normalised_set and norm not in norm_to_orig:
             norm_to_orig[norm] = orig_name
 
-    # Pick only the EEG channels (using original names for MNE)
     orig_picks = [norm_to_orig[n] for n in normalised_names if n in norm_to_orig]
     raw.pick_channels(orig_picks)
 
@@ -79,11 +77,9 @@ def load_edf(
     if raw.info["sfreq"] != target_sr:
         raw.resample(target_sr)
 
-    # Get data in microvolts
-    # MNE internally stores in volts, scale to uV
+    # MNE stores volts internally
     data = raw.get_data() * 1e6  # V -> uV
 
-    # Build metadata
     meas_date = raw.info.get("meas_date")
     if isinstance(meas_date, datetime):
         recording_date = meas_date.isoformat()
@@ -107,8 +103,6 @@ def load_edf(
         } if subject_info else {},
     }
 
-    # The channel order in data matches orig_picks order, which matches
-    # the normalised_names order (filtered to those we could map back)
     final_ch_names = [n for n in normalised_names if n in norm_to_orig]
 
     return data, final_ch_names, metadata

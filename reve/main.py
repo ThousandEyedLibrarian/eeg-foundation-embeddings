@@ -36,7 +36,6 @@ def main() -> None:
     )
     logger = logging.getLogger(__name__)
 
-    # Build CLI overrides dict
     cli_overrides = {}
     for override in args.override:
         if "=" not in override:
@@ -45,21 +44,17 @@ def main() -> None:
         key, value = override.split("=", 1)
         cli_overrides[key] = value
 
-    # HF token from CLI takes highest priority
     if args.hf_token:
         cli_overrides["model.hf_token"] = args.hf_token
 
-    # Load config
     config = load_config(yaml_path=args.config, cli_overrides=cli_overrides or None)
 
-    # Check for HF token
     if not config.model.hf_token:
         logger.warning(
             "No HuggingFace token found. REVE is a gated model - "
             "provide a token via --hf-token, HF_TOKEN env var, or config file."
         )
 
-    # Discover EDF files
     input_path = args.input_path
     if input_path.is_file():
         edf_files = [input_path]
@@ -74,18 +69,15 @@ def main() -> None:
 
     logger.info("Found %d EDF file(s) to process", len(edf_files))
 
-    # Ensure output directory exists
     output_dir = args.output_path
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load model once
     model, pos_bank = load_model(
         size=config.model.size,
         hf_token=config.model.hf_token,
         device=config.model.device,
     )
 
-    # Process each EDF
     successes = 0
     failures = 0
 
@@ -98,7 +90,6 @@ def main() -> None:
         else:
             failures += 1
 
-    # Summary
     logger.info(
         "Complete: %d succeeded, %d failed out of %d files",
         successes, failures, len(edf_files),

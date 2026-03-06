@@ -1,4 +1,4 @@
-"""Zarr output writer - one .zarr store per EDF with rich metadata."""
+"""Zarr output writer - one .zarr store per EDF file."""
 
 from __future__ import annotations
 
@@ -58,7 +58,6 @@ def write_embeddings(
     if output_path.suffix != ".zarr":
         output_path = output_path.with_suffix(".zarr")
 
-    # Ensure parent directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     compressor = _get_compressor(compression, compression_level)
@@ -71,7 +70,6 @@ def write_embeddings(
 
     n_windows, emb_dim = embeddings.shape
 
-    # Store per-window embeddings
     if store_per_window:
         root.create_array(
             name="embeddings",
@@ -86,7 +84,6 @@ def write_embeddings(
             chunks=(min(n_windows, 256),),
         )
 
-    # Compute and store mean embedding (over valid windows only)
     if store_mean_pooled:
         valid_mask = padding_mask.astype(bool)
         if valid_mask.any():
@@ -101,7 +98,6 @@ def write_embeddings(
             compressor=compressor,
         )
 
-    # Write metadata as root attributes
     root_attrs = {
         "embedding_dim": int(emb_dim),
         "n_windows": int(n_windows),
@@ -111,8 +107,7 @@ def write_embeddings(
         "zarr_format": zarr_format,
     }
 
-    # Merge in caller-provided metadata (preprocessing params, model info, etc.)
-    # Convert any non-serialisable values
+    # Caller metadata, converted to JSON-safe types
     for key, value in metadata.items():
         root_attrs[key] = _make_json_safe(value)
 

@@ -49,16 +49,6 @@ class FullConfig:
     verbose: bool = False
 
 
-def _deep_update(base: dict, overrides: dict) -> dict:
-    """Recursively merge overrides into base dict."""
-    for key, value in overrides.items():
-        if isinstance(value, dict) and isinstance(base.get(key), dict):
-            _deep_update(base[key], value)
-        else:
-            base[key] = value
-    return base
-
-
 def _dict_to_dataclass(cls, data: dict) -> Any:
     """Convert a dict to a dataclass, ignoring unknown keys."""
     known_fields = {f.name for f in fields(cls)}
@@ -105,20 +95,19 @@ def load_config(
     """
     config = FullConfig()
 
-    # Load YAML if provided
     if yaml_path:
         raw = _load_yaml(yaml_path)
 
         if "model" in raw and isinstance(raw["model"], dict):
             model_dict = raw["model"]
-            # Map 'name' to 'model_name' for convenience
+            # YAML uses 'name', dataclass uses 'model_name'
             if "name" in model_dict:
                 model_dict["model_name"] = model_dict.pop("name")
             config.model = _dict_to_dataclass(ModelConfig, model_dict)
 
         if "preprocessing" in raw and isinstance(raw["preprocessing"], dict):
             preproc_dict = dict(raw["preprocessing"])
-            # Handle bandpass shorthand
+            # bandpass: [low, high] shorthand -> separate fields
             bandpass = preproc_dict.pop("bandpass", None)
             config.preprocessing = _dict_to_dataclass(
                 PreprocessingConfig, preproc_dict,
@@ -130,12 +119,10 @@ def load_config(
         if "output" in raw and isinstance(raw["output"], dict):
             config.output = _dict_to_dataclass(OutputConfig, raw["output"])
 
-    # Apply CLI overrides
     if cli_overrides:
         for key, value in cli_overrides.items():
             _set_nested_attr(config, key, value)
 
-    # Resolve HF token from env if not set
     _resolve_hf_token(config)
 
     return config
@@ -148,7 +135,7 @@ def _set_nested_attr(obj: Any, dotted_key: str, value: Any) -> None:
         obj = getattr(obj, part)
 
     attr_name = parts[-1]
-    # Convert value to the correct type based on the field type
+    # Coerce string values to match the existing field type
     current = getattr(obj, attr_name, None)
     if current is not None:
         target_type = type(current)
