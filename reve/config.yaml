@@ -1,0 +1,26 @@
+model:
+  name: reve
+  size: base              # base | large
+  hf_token: ""            # HuggingFace token (or use HF_TOKEN env var / --hf-token CLI)
+  device: cuda
+  batch_size: 2           # REVE is larger, smaller batches
+
+preprocessing:
+  target_sr: 200
+  bandpass: [0.5, 99.5]
+  notch_freq: 50.0
+  window_size_sec: 10.0
+  window_overlap_sec: 0.0
+  skip_start_sec: 0.0
+  max_duration_sec: 0.0
+  min_duration_sec: 0.0
+  normalisation: zscore
+  clip_std: 15.0
+  units: uV
+
+output:
+  zarr_compression: zstd
+  zarr_compression_level: 5
+  zarr_format: 2
+  store_per_window: true
+  store_mean_pooled: true

@@ -1,0 +1,36 @@
+[project]
+name = "eeg-foundation-embeddings"
+version = "0.1.0"
+description = "Docker images for extracting embeddings from EDF files using EEG foundation models"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "mne",
+    "pyyaml",
+    "tqdm",
+    "einops",
+    "zarr>=3,<4",
+    "numcodecs",
+]
+
+[project.optional-dependencies]
+labram = [
+    "braindecode",
+    "timm==0.4.12",
+]
+reve = [
+    "transformers>=4.57.1",
+    "safetensors",
+    "huggingface_hub",
+]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["shared", "labram", "reve"]

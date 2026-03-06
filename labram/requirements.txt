@@ -1,0 +1,15 @@
+# Core
+numpy
+scipy
+mne
+pyyaml
+tqdm
+einops
+
+# Model
+braindecode
+timm==0.4.12
+
+# Output
+zarr>=3,<4
+numcodecs
