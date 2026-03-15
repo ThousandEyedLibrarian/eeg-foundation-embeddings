@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from shared.channel_maps import get_labram_matched_channels
+from shared.channel_maps import LABRAM_STANDARD_1020, get_labram_matched_channels
 from shared.config import FullConfig
 from shared.edf_loader import load_edf
 from shared.preprocessing import preprocess
@@ -18,6 +18,7 @@ from shared.zarr_writer import write_embeddings
 logger = logging.getLogger(__name__)
 
 LABRAM_EMBEDDING_DIM = 200
+LABRAM_N_CHANS = 128
 
 
 def load_model_braindecode(
@@ -87,16 +88,22 @@ def load_model_original(
 def extract_embeddings_braindecode(
     model: Any,
     windows: np.ndarray,
-    input_chans: list[int],
+    chan_positions: list[int],
     batch_size: int = 4,
     device: str = "cuda",
 ) -> np.ndarray:
     """Extract embeddings using the braindecode backend.
 
+    The braindecode Labram model hardcodes n_chans=128 internally, so
+    input must always be zero-padded to 128 channels with real data
+    placed at the correct position indices.
+
     Args:
         model: Loaded braindecode Labram model.
-        windows: Array of shape (n_windows, n_channels, n_times).
-        input_chans: LaBraM position indices (1-based, CLS at 0).
+        windows: Array of shape (n_windows, n_matched_channels, n_times).
+        chan_positions: 0-based indices into LABRAM_STANDARD_1020 for each
+            matched channel, indicating where to place data in the
+            128-channel input tensor.
         batch_size: Batch size for inference.
         device: Torch device string.
 
@@ -104,16 +111,23 @@ def extract_embeddings_braindecode(
         Embeddings array of shape (n_windows, 200).
     """
     n_windows = windows.shape[0]
+    n_times = windows.shape[2]
     all_embeddings = []
-    input_chans_tensor = torch.tensor(input_chans, dtype=torch.long, device=device)
+
+    # All 128+1 position indices (CLS at 0, channels 1-128)
+    all_chans = torch.arange(0, LABRAM_N_CHANS + 1, dtype=torch.long, device=device)
 
     for start in range(0, n_windows, batch_size):
         end = min(start + batch_size, n_windows)
-        batch = torch.from_numpy(windows[start:end]).float().to(device)
+        b = end - start
 
-        # braindecode Labram.forward_features expects (B, n_chans, n_times)
-        # and input_chans as a 1D tensor of position indices
-        emb = model.forward_features(batch, input_chans_tensor)
+        # Zero-pad to 128 channels, place real data at correct positions
+        padded = torch.zeros(b, LABRAM_N_CHANS, n_times, device=device)
+        real_data = torch.from_numpy(windows[start:end]).float().to(device)
+        for i, pos in enumerate(chan_positions):
+            padded[:, pos, :] = real_data[:, i, :]
+
+        emb = model.forward_features(padded, all_chans)
         all_embeddings.append(emb.cpu().numpy())
 
     return np.concatenate(all_embeddings, axis=0)
@@ -195,6 +209,10 @@ def process_edf(
         ch_indices = [ch_name_to_idx[name] for name in matched_names]
         data = data[ch_indices]
 
+        # 0-based positions in LABRAM_STANDARD_1020 for padding to 128 channels
+        labram_name_to_pos = {n: i for i, n in enumerate(LABRAM_STANDARD_1020)}
+        chan_positions = [labram_name_to_pos[name] for name in matched_names]
+
         logger.info(
             "Matched %d/%d channels for %s",
             len(matched_names), len(ch_names), edf_path.name,
@@ -223,7 +241,7 @@ def process_edf(
             )
         else:
             embeddings = extract_embeddings_braindecode(
-                model, windows, input_chans,
+                model, windows, chan_positions,
                 config.model.batch_size, config.model.device,
             )
 

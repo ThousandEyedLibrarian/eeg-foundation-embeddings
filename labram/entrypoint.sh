@@ -135,9 +135,11 @@ fi
 
 PYTHON_ARGS=""
 
-if [[ -n "$CONFIG_FILE" ]]; then
-    PYTHON_ARGS="--config ${CONFIG_FILE}"
+# Default to bundled config if none specified
+if [[ -z "$CONFIG_FILE" ]]; then
+    CONFIG_FILE="/app/labram/config.yaml"
 fi
+PYTHON_ARGS="--config ${CONFIG_FILE}"
 
 for override in $CLI_OVERRIDES; do
     PYTHON_ARGS="${PYTHON_ARGS} --override ${override}"

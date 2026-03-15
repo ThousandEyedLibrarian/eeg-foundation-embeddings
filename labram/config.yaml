@@ -8,7 +8,7 @@ preprocessing:
   target_sr: 200
   bandpass: [0.1, 75.0]
   notch_freq: 50.0
-  window_size_sec: 10.0
+  window_size_sec: 15.0     # pretrained model expects n_times=3000 (15s at 200Hz)
   window_overlap_sec: 0.0
   skip_start_sec: 0.0
   max_duration_sec: 0.0
