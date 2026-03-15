@@ -203,6 +203,72 @@ def get_labram_matched_channels(
     return matched_names, matched_indices
 
 
+# --------------------------------------------------------------------------- #
+# BENDR 19-channel standard 10-20 order
+# BENDR uses old-style names (T3/T4/T5/T6) and expects 20 channels total:
+# 19 standard 10-20 EEG + 1 relative amplitude channel computed at runtime.
+# --------------------------------------------------------------------------- #
+
+BENDR_STANDARD_1020: tuple[str, ...] = (
+    "FP1", "FP2", "F7", "F3", "FZ", "F4", "F8",
+    "T3", "C3", "CZ", "C4", "T4",
+    "T5", "P3", "PZ", "P4", "T6",
+    "O1", "O2",
+)
+
+# Pre-built lookup: normalised name -> index in BENDR_STANDARD_1020
+_BENDR_NAME_TO_IDX: dict[str, int] = {
+    name: i for i, name in enumerate(BENDR_STANDARD_1020)
+}
+
+# BENDR uses old-style 10-20 names, so we need reverse aliases
+# (modern -> old) for matching channels that have been normalised
+_BENDR_REVERSE_ALIASES: dict[str, str] = {
+    "T7": "T3",
+    "T8": "T4",
+    "P7": "T5",
+    "P8": "T6",
+}
+
+
+def get_bendr_matched_channels(
+    ch_names: list[str],
+) -> tuple[list[str], list[int]]:
+    """Get channels matching BENDR's 19 standard 10-20 channels in model order.
+
+    Iterates over BENDR_STANDARD_1020 to ensure returned channels are always
+    in the canonical order expected by the pretrained model. Handles both
+    old-style (T3/T4/T5/T6) and modern (T7/T8/P7/P8) names.
+
+    Args:
+        ch_names: Normalised (uppercase) channel names from the EDF file.
+
+    Returns:
+        Tuple of (matched_channel_names, indices_into_ch_names).
+        matched_channel_names uses BENDR's expected names (old-style)
+        and are ordered to match BENDR_STANDARD_1020.
+    """
+    # Build lookup from normalised EDF names to their index in ch_names.
+    # Map both direct and reverse-aliased names to support old and modern
+    # naming conventions.
+    name_to_data_idx: dict[str, int] = {}
+    for i, name in enumerate(ch_names):
+        if name in _BENDR_NAME_TO_IDX:
+            name_to_data_idx[name] = i
+        elif name in _BENDR_REVERSE_ALIASES:
+            name_to_data_idx[_BENDR_REVERSE_ALIASES[name]] = i
+
+    # Iterate in BENDR canonical order so output matches model expectations
+    matched_names = []
+    matched_indices = []
+    for bendr_name in BENDR_STANDARD_1020:
+        if bendr_name in name_to_data_idx:
+            matched_names.append(bendr_name)
+            matched_indices.append(name_to_data_idx[bendr_name])
+
+    return matched_names, matched_indices
+
+
 def map_channels_to_reve(
     ch_names: list[str], pos_bank
 ) -> "torch.Tensor":

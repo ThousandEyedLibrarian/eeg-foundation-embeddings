@@ -3,8 +3,10 @@
 import pytest
 
 from shared.channel_maps import (
+    BENDR_STANDARD_1020,
     LABRAM_STANDARD_1020,
     detect_channels,
+    get_bendr_matched_channels,
     get_labram_matched_channels,
     map_channels_to_labram,
     normalise_channel_name,
@@ -125,3 +127,59 @@ class TestGetLabramMatchedChannels:
         assert names == ["CZ", "FP1"]
         # CZ=42, FP1=1
         assert indices == [42, 1]
+
+
+class TestGetBendrMatchedChannels:
+    """Tests for get_bendr_matched_channels."""
+
+    def test_direct_old_style_match(self):
+        names, indices = get_bendr_matched_channels(["T3", "T4", "FP1"])
+        # Returns in BENDR canonical order: FP1 (idx 0), T3 (idx 7), T4 (idx 11)
+        assert names == ["FP1", "T3", "T4"]
+
+    def test_modern_to_old_reverse_alias(self):
+        # T7 -> T3, T8 -> T4, P7 -> T5, P8 -> T6
+        names, indices = get_bendr_matched_channels(["T7", "T8", "P7", "P8"])
+        # Canonical order: T3(7), T4(11), T5(12), T6(16)
+        assert names == ["T3", "T4", "T5", "T6"]
+
+    def test_mixed_old_and_modern_names(self):
+        names, indices = get_bendr_matched_channels(["T3", "T8", "FP1"])
+        assert "FP1" in names
+        assert "T3" in names
+        assert "T4" in names  # T8 maps to T4 in BENDR
+
+    def test_non_matching_channels_excluded(self):
+        names, indices = get_bendr_matched_channels(["FP1", "UNKNOWN", "AF7"])
+        assert names == ["FP1"]
+        assert len(indices) == 1
+
+    def test_empty_input(self):
+        names, indices = get_bendr_matched_channels([])
+        assert names == []
+        assert indices == []
+
+    def test_returns_bendr_canonical_order(self):
+        # Give channels in reverse order - should come back in BENDR order
+        reversed_ch = list(reversed(BENDR_STANDARD_1020))
+        names, indices = get_bendr_matched_channels(reversed_ch)
+        assert names == list(BENDR_STANDARD_1020)
+
+    def test_indices_point_to_correct_source_data(self):
+        # Simulate EDF with channels in a specific order
+        edf_channels = ["CZ", "FP1", "O2", "T3"]
+        names, indices = get_bendr_matched_channels(edf_channels)
+        # BENDR order: FP1(0), T3(7), CZ(9), O2(18)
+        assert names == ["FP1", "T3", "CZ", "O2"]
+        # Indices into edf_channels: FP1=1, T3=3, CZ=0, O2=2
+        assert indices == [1, 3, 0, 2]
+
+    def test_all_19_channels_matched(self):
+        names, indices = get_bendr_matched_channels(list(BENDR_STANDARD_1020))
+        assert len(names) == 19
+        assert names == list(BENDR_STANDARD_1020)
+
+    def test_returned_names_use_old_style(self):
+        # Even when input uses modern names, output should use BENDR's old-style
+        names, _ = get_bendr_matched_channels(["T7"])
+        assert names == ["T3"]

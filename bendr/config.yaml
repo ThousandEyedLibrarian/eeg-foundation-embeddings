@@ -1,0 +1,24 @@
+model:
+  name: bendr
+  device: cuda
+  batch_size: 4
+
+preprocessing:
+  target_sr: 256
+  bandpass: [0.1, 75.0]
+  notch_freq: 50.0
+  window_size_sec: 10.0
+  window_overlap_sec: 0.0
+  skip_start_sec: 0.0
+  max_duration_sec: 0.0
+  min_duration_sec: 0.0
+  normalisation: none
+  scale_factor: 0.01
+  units: uV
+
+output:
+  zarr_compression: zstd
+  zarr_compression_level: 5
+  zarr_format: 2
+  store_per_window: true
+  store_mean_pooled: true
