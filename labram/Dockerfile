@@ -26,8 +26,11 @@ RUN uv pip install --system \
     torch==2.0.1+cu118 \
     --index-url https://download.pytorch.org/whl/cu118
 
-# Install project deps from lockfile
-RUN uv pip install --system ".[labram]"
+# Install project deps from lockfile (pinned versions for reproducibility)
+RUN uv export --extra labram --no-emit-project --frozen > /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && uv pip install --system --no-deps . \
+    && rm /tmp/requirements.txt
 
 # Pre-download braindecode checkpoint
 RUN python3 -c "\
@@ -35,7 +38,7 @@ from braindecode.models import Labram; \
 model = Labram.from_pretrained('braindecode/labram-pretrained'); \
 print('braindecode checkpoint cached')"
 
-# Pre-download original checkpoint
+# Pre-download original checkpoint (optional - only needed for --backend original)
 RUN curl -L -o /opt/labram-base.pth \
     https://huggingface.co/935963004/LaBraM/resolve/main/labram-base.pth \
     || echo "Warning: could not download original LaBraM checkpoint"

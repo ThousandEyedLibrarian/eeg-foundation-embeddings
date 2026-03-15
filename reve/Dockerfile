@@ -26,8 +26,11 @@ RUN uv pip install --system \
     torch==2.4.0+cu124 \
     --index-url https://download.pytorch.org/whl/cu124
 
-# Install project deps from lockfile
-RUN uv pip install --system ".[reve]"
+# Install project deps from lockfile (pinned versions for reproducibility)
+RUN uv export --extra reve --no-emit-project --frozen > /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && uv pip install --system --no-deps . \
+    && rm /tmp/requirements.txt
 
 # Pre-download reve-positions (open access)
 RUN python3 -c "\

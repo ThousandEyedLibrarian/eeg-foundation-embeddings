@@ -19,9 +19,10 @@ labram = [
     "braindecode==1.3.2",
     "timm==0.4.12",
     "huggingface_hub",
+    "safetensors",
 ]
 reve = [
-    "transformers>=4.57.1",
+    "transformers>=4.57.1,<6",
     "safetensors",
     "huggingface_hub",
 ]
